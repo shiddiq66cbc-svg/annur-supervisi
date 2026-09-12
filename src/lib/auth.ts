@@ -28,7 +28,7 @@ async function fetchCurrentUser(): Promise<CurrentUser | null> {
   const user = userData.user;
 
   // Pastikan baris profil ada (dibuat aman di sisi database).
-  await supabase.rpc("ensure_profile", { _full_name: null });
+  await supabase.rpc("ensure_profile", {});
 
   const [profileRes, roleRes, teacherRes, supervisorRes] = await Promise.all([
     supabase.from("profiles").select("full_name, nip, phone, email").eq("id", user.id).maybeSingle(),
@@ -79,9 +79,9 @@ export async function logAudit(
   try {
     await supabase.rpc("log_audit", {
       _action: action,
-      _entity: options.entity ?? null,
-      _entity_id: options.entityId ?? null,
-      _description: options.description ?? null,
+      _entity: options.entity,
+      _entity_id: options.entityId,
+      _description: options.description,
       _metadata: {},
     });
   } catch {
