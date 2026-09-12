@@ -345,6 +345,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_set_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      claim_admin_if_none: { Args: never; Returns: boolean }
       current_supervisor_id: { Args: never; Returns: string }
       current_teacher_id: { Args: never; Returns: string }
       ensure_profile: {
@@ -376,6 +384,16 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_admin_or_kepala: { Args: never; Returns: boolean }
       is_supervisor_of: { Args: { _teacher_id: string }; Returns: boolean }
+      log_audit: {
+        Args: {
+          _action: string
+          _description?: string
+          _entity?: string
+          _entity_id?: string
+          _metadata?: Json
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "kepala_madrasah" | "supervisor" | "guru"
