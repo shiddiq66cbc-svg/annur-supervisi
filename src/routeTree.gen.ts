@@ -13,8 +13,12 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as AuthenticatedAuditLogRouteImport } from './routes/_authenticated/audit-log'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedGuruRouteImport } from './routes/_authenticated/guru'
+import { Route as AuthenticatedPenugasanRouteImport } from './routes/_authenticated/penugasan'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
+import { Route as AuthenticatedSupervisorRouteImport } from './routes/_authenticated/supervisor'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -35,9 +39,24 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAuditLogRoute = AuthenticatedAuditLogRouteImport.update({
+  id: '/audit-log',
+  path: '/audit-log',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedGuruRoute = AuthenticatedGuruRouteImport.update({
+  id: '/guru',
+  path: '/guru',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPenugasanRoute = AuthenticatedPenugasanRouteImport.update({
+  id: '/penugasan',
+  path: '/penugasan',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedProfilRoute = AuthenticatedProfilRouteImport.update({
@@ -45,20 +64,33 @@ const AuthenticatedProfilRoute = AuthenticatedProfilRouteImport.update({
   path: '/profil',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSupervisorRoute = AuthenticatedSupervisorRouteImport.update({
+  id: '/supervisor',
+  path: '/supervisor',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/audit-log': typeof AuthenticatedAuditLogRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/guru': typeof AuthenticatedGuruRoute
+  '/penugasan': typeof AuthenticatedPenugasanRoute
   '/profil': typeof AuthenticatedProfilRoute
+  '/supervisor': typeof AuthenticatedSupervisorRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/audit-log': typeof AuthenticatedAuditLogRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/guru': typeof AuthenticatedGuruRoute
+  '/penugasan': typeof AuthenticatedPenugasanRoute
   '/profil': typeof AuthenticatedProfilRoute
+  '/supervisor': typeof AuthenticatedSupervisorRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -66,22 +98,48 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/_authenticated/audit-log': typeof AuthenticatedAuditLogRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/guru': typeof AuthenticatedGuruRoute
+  '/_authenticated/penugasan': typeof AuthenticatedPenugasanRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
+  '/_authenticated/supervisor': typeof AuthenticatedSupervisorRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/reset-password' | '/dashboard' | '/profil'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/reset-password'
+    | '/audit-log'
+    | '/dashboard'
+    | '/guru'
+    | '/penugasan'
+    | '/profil'
+    | '/supervisor'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/reset-password' | '/dashboard' | '/profil'
+  to:
+    | '/'
+    | '/auth'
+    | '/reset-password'
+    | '/audit-log'
+    | '/dashboard'
+    | '/guru'
+    | '/penugasan'
+    | '/profil'
+    | '/supervisor'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/reset-password'
+    | '/_authenticated/audit-log'
     | '/_authenticated/dashboard'
+    | '/_authenticated/guru'
+    | '/_authenticated/penugasan'
     | '/_authenticated/profil'
+    | '/_authenticated/supervisor'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -121,11 +179,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/audit-log': {
+      id: '/_authenticated/audit-log'
+      path: '/audit-log'
+      fullPath: '/audit-log'
+      preLoaderRoute: typeof AuthenticatedAuditLogRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/guru': {
+      id: '/_authenticated/guru'
+      path: '/guru'
+      fullPath: '/guru'
+      preLoaderRoute: typeof AuthenticatedGuruRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/penugasan': {
+      id: '/_authenticated/penugasan'
+      path: '/penugasan'
+      fullPath: '/penugasan'
+      preLoaderRoute: typeof AuthenticatedPenugasanRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/profil': {
@@ -135,17 +214,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProfilRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/supervisor': {
+      id: '/_authenticated/supervisor'
+      path: '/supervisor'
+      fullPath: '/supervisor'
+      preLoaderRoute: typeof AuthenticatedSupervisorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAuditLogRoute: typeof AuthenticatedAuditLogRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedGuruRoute: typeof AuthenticatedGuruRoute
+  AuthenticatedPenugasanRoute: typeof AuthenticatedPenugasanRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
+  AuthenticatedSupervisorRoute: typeof AuthenticatedSupervisorRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAuditLogRoute: AuthenticatedAuditLogRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedGuruRoute: AuthenticatedGuruRoute,
+  AuthenticatedPenugasanRoute: AuthenticatedPenugasanRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,
+  AuthenticatedSupervisorRoute: AuthenticatedSupervisorRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
