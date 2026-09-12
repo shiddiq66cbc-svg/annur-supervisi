@@ -347,6 +347,25 @@ export type Database = {
     Functions: {
       current_supervisor_id: { Args: never; Returns: string }
       current_teacher_id: { Args: never; Returns: string }
+      ensure_profile: {
+        Args: { _full_name?: string }
+        Returns: {
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          nip: string | null
+          phone: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
