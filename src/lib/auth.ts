@@ -79,10 +79,9 @@ export async function logAudit(
   try {
     await supabase.rpc("log_audit", {
       _action: action,
-      _entity: options.entity,
-      _entity_id: options.entityId,
-      _description: options.description,
-      _metadata: {},
+      ...(options.entity ? { _entity: options.entity } : {}),
+      ...(options.entityId ? { _entity_id: options.entityId } : {}),
+      ...(options.description ? { _description: options.description } : {}),
     });
   } catch {
     // Log audit tidak boleh menghentikan alur pengguna.
