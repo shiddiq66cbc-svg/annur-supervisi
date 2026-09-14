@@ -90,7 +90,7 @@ export function AppShell({
           Portal Supervisi
         </p>
         <p className="mt-1 text-base font-semibold leading-tight">MTs Annur 1</p>
-        <p className="text-xs text-sidebar-foreground/70">Cinagara – Malangbong – Garut</p>
+        <p className="text-xs text-sidebar-foreground/70">Malangbong – Garut</p>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {items.map((item) => {
