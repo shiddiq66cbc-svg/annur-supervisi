@@ -34,6 +34,13 @@ function Beranda() {
     <div className="min-h-screen">
       <section className="surface-gradient text-primary-foreground">
         <div className="mx-auto max-w-5xl px-6 py-20 text-center sm:py-28">
+          <div className="mb-6 flex justify-center">
+            <img
+              src="/LOGO MTS ANNUR 1.png"
+              alt="Logo MTs Annur 1"
+              className="h-28 w-28 object-contain sm:h-36 sm:w-36"
+            />
+          </div>
           <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-5xl">
             Portal Supervisi Akademik
           </h1><br>
