@@ -9,7 +9,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Sistem digital supervisi akademik guru MTs Annur 1 Cinagara, Malangbong, Garut: penjadwalan, penilaian, tindak lanjut, dan laporan.",
+          "Sistem digital supervisi akademik guru MTs Annur 1, Malangbong, Garut: penjadwalan, penilaian, tindak lanjut, dan laporan.",
       },
       { property: "og:title", content: "Portal Supervisi Akademik MTs Annur 1" },
       {
