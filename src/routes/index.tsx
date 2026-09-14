@@ -34,12 +34,12 @@ function Beranda() {
     <div className="min-h-screen">
       <section className="surface-gradient text-primary-foreground">
         <div className="mx-auto max-w-5xl px-6 py-20 text-center sm:py-28">
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent">
-            Madrasah Tsanawiyah Annur 1
-          </p>
           <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-5xl">
             Portal Supervisi Akademik
           </h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent">
+            Madrasah Tsanawiyah Annur 1
+          </p>
           <p className="mt-4 text-sm opacity-90 sm:text-base">
             Malangbong – Garut · Tahun Pelajaran 2026/2027
           </p>
