@@ -114,13 +114,21 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function AuthWatcher() {
+  const router = useRouter();
+  useAuthListener(useCallback(() => router.invalidate(), [router]));
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
+      <AuthWatcher />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <Toaster richColors position="top-right" />
     </QueryClientProvider>
   );
 }

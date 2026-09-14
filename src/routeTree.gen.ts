@@ -16,6 +16,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedAuditLogRouteImport } from './routes/_authenticated/audit-log'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedGuruRouteImport } from './routes/_authenticated/guru'
+import { Route as AuthenticatedPenggunaRouteImport } from './routes/_authenticated/pengguna'
 import { Route as AuthenticatedPenugasanRouteImport } from './routes/_authenticated/penugasan'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedSupervisorRouteImport } from './routes/_authenticated/supervisor'
@@ -54,6 +55,11 @@ const AuthenticatedGuruRoute = AuthenticatedGuruRouteImport.update({
   path: '/guru',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPenggunaRoute = AuthenticatedPenggunaRouteImport.update({
+  id: '/pengguna',
+  path: '/pengguna',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedPenugasanRoute = AuthenticatedPenugasanRouteImport.update({
   id: '/penugasan',
   path: '/penugasan',
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/audit-log': typeof AuthenticatedAuditLogRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/guru': typeof AuthenticatedGuruRoute
+  '/pengguna': typeof AuthenticatedPenggunaRoute
   '/penugasan': typeof AuthenticatedPenugasanRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/supervisor': typeof AuthenticatedSupervisorRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/audit-log': typeof AuthenticatedAuditLogRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/guru': typeof AuthenticatedGuruRoute
+  '/pengguna': typeof AuthenticatedPenggunaRoute
   '/penugasan': typeof AuthenticatedPenugasanRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/supervisor': typeof AuthenticatedSupervisorRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/_authenticated/audit-log': typeof AuthenticatedAuditLogRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/guru': typeof AuthenticatedGuruRoute
+  '/_authenticated/pengguna': typeof AuthenticatedPenggunaRoute
   '/_authenticated/penugasan': typeof AuthenticatedPenugasanRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/_authenticated/supervisor': typeof AuthenticatedSupervisorRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/audit-log'
     | '/dashboard'
     | '/guru'
+    | '/pengguna'
     | '/penugasan'
     | '/profil'
     | '/supervisor'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
     | '/audit-log'
     | '/dashboard'
     | '/guru'
+    | '/pengguna'
     | '/penugasan'
     | '/profil'
     | '/supervisor'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/_authenticated/audit-log'
     | '/_authenticated/dashboard'
     | '/_authenticated/guru'
+    | '/_authenticated/pengguna'
     | '/_authenticated/penugasan'
     | '/_authenticated/profil'
     | '/_authenticated/supervisor'
@@ -200,6 +212,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedGuruRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/pengguna': {
+      id: '/_authenticated/pengguna'
+      path: '/pengguna'
+      fullPath: '/pengguna'
+      preLoaderRoute: typeof AuthenticatedPenggunaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/penugasan': {
       id: '/_authenticated/penugasan'
       path: '/penugasan'
@@ -228,6 +247,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAuditLogRoute: typeof AuthenticatedAuditLogRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedGuruRoute: typeof AuthenticatedGuruRoute
+  AuthenticatedPenggunaRoute: typeof AuthenticatedPenggunaRoute
   AuthenticatedPenugasanRoute: typeof AuthenticatedPenugasanRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
   AuthenticatedSupervisorRoute: typeof AuthenticatedSupervisorRoute
@@ -237,6 +257,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAuditLogRoute: AuthenticatedAuditLogRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedGuruRoute: AuthenticatedGuruRoute,
+  AuthenticatedPenggunaRoute: AuthenticatedPenggunaRoute,
   AuthenticatedPenugasanRoute: AuthenticatedPenugasanRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,
   AuthenticatedSupervisorRoute: AuthenticatedSupervisorRoute,
