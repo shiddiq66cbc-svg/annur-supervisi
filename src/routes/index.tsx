@@ -41,7 +41,7 @@ function Beranda() {
             Portal Supervisi Akademik
           </h1>
           <p className="mt-4 text-sm opacity-90 sm:text-base">
-            Cinagara – Malangbong – Garut · Tahun Pelajaran 2026/2027
+            Malangbong – Garut · Tahun Pelajaran 2026/2027
           </p>
           <p className="mx-auto mt-6 max-w-2xl text-sm opacity-90 sm:text-base">
             Sistem resmi pengelolaan supervisi akademik guru: perencanaan, penjadwalan, pemeriksaan
