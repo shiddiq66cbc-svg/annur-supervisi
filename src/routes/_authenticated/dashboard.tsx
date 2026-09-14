@@ -243,7 +243,7 @@ function RingkasanGuru({ teacherId }: { teacherId: string | null }) {
           label="Supervisor Pembina"
           value={supervisor?.full_name ?? "Belum ditetapkan"}
           icon={UserCog}
-          hint={supervisor?.position ?? undefined}
+          hint={supervisor?.position ?? ""}
         />
         <StatCard label="Jadwal Supervisi" value="—" icon={CalendarClock} hint="Tersedia pada tahap berikutnya" />
         <StatCard label="Hasil Supervisi" value="—" icon={ClipboardList} hint="Tersedia pada tahap berikutnya" />
