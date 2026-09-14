@@ -66,7 +66,7 @@ function Beranda() {
           ))}
         </div>
         <p className="mt-10 text-center text-xs text-muted-foreground">
-          Penanggung Jawab Supervisi Akademik: Iwa Abdul Wahid, S.Pd., M.M. — Kepala Madrasah
+          PORTAL SUPERVISI AKADEMIK - MTS ANNUR 1 - TAHUN PELAJARAN 2026/2027
         </p>
       </section>
     </div>
