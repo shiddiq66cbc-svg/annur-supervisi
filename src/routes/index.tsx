@@ -36,7 +36,7 @@ function Beranda() {
         <div className="mx-auto max-w-5xl px-6 py-20 text-center sm:py-28">
           <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-5xl">
             Portal Supervisi Akademik
-          </h1>
+          </h1><br>
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent">
             Madrasah Tsanawiyah Annur 1
           </p>
