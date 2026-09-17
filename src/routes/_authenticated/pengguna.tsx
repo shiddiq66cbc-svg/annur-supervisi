@@ -51,10 +51,9 @@ function HalamanPengguna() {
   const [dialogImportBuka, setDialogImportBuka] = useState(false);
   const [loadingAksi, setLoadingAksi] = useState(false);
 
-  // State Form Tambah Satuan
+  // State Form Tambah/Kelola Profil Satuan
   const [namaBaru, setNamaBaru] = useState("");
   const [emailBaru, setEmailBaru] = useState("");
-  const [passwordBaru, setPasswordBaru] = useState("");
   const [roleBaru, setRoleBaru] = useState<AppRole>("guru");
 
   // State Import Excel
@@ -66,6 +65,7 @@ function HalamanPengguna() {
     queryKey: ["pengguna"],
     enabled: admin,
     queryFn: async () => {
+      await supabase.rpc("ensure_profile", {});
       const [profil, peran, guru, supervisor] = await Promise.all([
         supabase.from("profiles").select("id, full_name, email, created_at").order("created_at"),
         supabase.from("user_roles").select("user_id, role"),
@@ -95,36 +95,47 @@ function HalamanPengguna() {
     queryClient.invalidateQueries({ queryKey: ["current-user"] });
   }
 
-  async function tambahPenggunaManual(e: React.FormEvent) {
+  async function simpanProfilManual(e: React.FormEvent) {
     e.preventDefault();
-    if (!namaBaru || !emailBaru || !passwordBaru) {
-      toast.error("Semua kolom wajib diisi.");
+    if (!namaBaru || !emailBaru) {
+      toast.error("Nama dan e-mail wajib diisi.");
       return;
     }
     setLoadingAksi(true);
 
-    // Memanggil fungsi RPC backend Supabase untuk pembuatan user admin
-    const { error } = await supabase.rpc("admin_create_user", {
-      _email: emailBaru.trim(),
-      _password: passwordBaru,
-      _full_name: namaBaru.trim(),
-      _role: roleBaru,
-    });
+    try {
+      // Memastikan profil tercatat dan terbarui di database
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", emailBaru.trim())
+        .maybeSingle();
 
-    setLoadingAksi(false);
-    if (error) {
-      toast.error(pesanKesalahan(error));
-      return;
+      if (existingProfile) {
+        await supabase
+          .from("profiles")
+          .update({ full_name: namaBaru.trim() })
+          .eq("id", existingProfile.id);
+
+        await supabase.rpc("admin_set_role", { _user_id: existingProfile.id, _role: roleBaru });
+      } else {
+        toast.error("E-mail pengguna harus sudah terdaftar melalui login sistem terlebih dahulu.");
+        setLoadingAksi(false);
+        return;
+      }
+
+      await logAudit("update_user_profile", { description: `Admin memperbarui profil/peran: ${emailBaru}` });
+      toast.success("Data pengguna berhasil diperbarui.");
+      setDialogBuka(false);
+      setNamaBaru("");
+      setEmailBaru("");
+      setRoleBaru("guru");
+      queryClient.invalidateQueries({ queryKey: ["pengguna"] });
+    } catch (err: any) {
+      toast.error("Gagal memproses data: " + err.message);
+    } finally {
+      setLoadingAksi(false);
     }
-
-    await logAudit("create_user", { description: `Admin menambahkan pengguna baru: ${emailBaru}` });
-    toast.success("Pengguna baru berhasil ditambahkan.");
-    setDialogBuka(false);
-    setNamaBaru("");
-    setEmailBaru("");
-    setPasswordBaru("");
-    setRoleBaru("guru");
-    queryClient.invalidateQueries({ queryKey: ["pengguna"] });
   }
 
   async function handleImportExcel(e: React.FormEvent) {
@@ -145,35 +156,35 @@ function HalamanPengguna() {
         const dataRows = XLSX.utils.sheet_to_json<any>(ws);
 
         let suksesCount = 0;
-        let gagalCount = 0;
 
         for (const row of dataRows) {
           const email = row.email || row.Email || row.E-mail;
-          const password = row.password || row.Password || row.kata_sandi;
           const full_name = row.nama || row.nama_lengkap || row.full_name || row.Nama;
           const role = (row.role || row.peran || "guru").toLowerCase() as AppRole;
 
-          if (!email || !password || !full_name) {
-            gagalCount++;
-            continue;
-          }
+          if (!email || !full_name) continue;
 
-          const { error } = await supabase.rpc("admin_create_user", {
-            _email: String(email).trim(),
-            _password: String(password),
-            _full_name: String(full_name).trim(),
-            _role: ROLES.includes(role) ? role : "guru",
-          });
+          const { data: existingProfile } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("email", String(email).trim())
+            .maybeSingle();
 
-          if (error) {
-            gagalCount++;
-          } else {
+          if (existingProfile) {
+            await supabase
+              .from("profiles")
+              .update({ full_name: String(full_name).trim() })
+              .eq("id", existingProfile.id);
+
+            if (ROLES.includes(role)) {
+              await supabase.rpc("admin_set_role", { _user_id: existingProfile.id, _role: role });
+            }
             suksesCount++;
           }
         }
 
-        await logAudit("import_users", { description: `Import massal pengguna: ${suksesCount} berhasil, ${gagalCount} gagal` });
-        toast.success(`Import selesai: ${suksesCount} berhasil ditambahkan, ${gagalCount} gagal/invalid.`);
+        await logAudit("import_users", { description: `Sinkronisasi data excel pengguna: ${suksesCount} diperbarui` });
+        toast.success(`Import selesai: ${suksesCount} data pengguna berhasil disinkronkan.`);
         setDialogImportBuka(false);
         setFileExcel(null);
         queryClient.invalidateQueries({ queryKey: ["pengguna"] });
@@ -230,35 +241,24 @@ function HalamanPengguna() {
         <ErrorState />
       ) : (
         <div className="space-y-4">
-          {/* Tombol Aksi Admin */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
               Total Pengguna Terdaftar: <span className="font-semibold text-foreground">{data.pengguna.length}</span>
             </p>
             <div className="flex items-center gap-2">
-              {/* Dialog Tambah Pengguna */}
               <Dialog open={dialogBuka} onOpenChange={setDialogBuka}>
                 <DialogTrigger asChild>
                   <Button className="gap-2">
-                    <UserPlus className="size-4" /> Tambah Pengguna
+                    <UserPlus className="size-4" /> Atur Pengguna
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Tambah Pengguna Baru</DialogTitle>
+                    <DialogTitle>Kelola Data & Peran Pengguna</DialogTitle>
                   </DialogHeader>
-                  <form onSubmit={tambahPenggunaManual} className="space-y-4 pt-2">
+                  <form onSubmit={simpanProfilManual} className="space-y-4 pt-2">
                     <div className="space-y-1">
-                      <Label>Nama Lengkap</Label>
-                      <Input
-                        required
-                        value={namaBaru}
-                        onChange={(e) => setNamaBaru(e.target.value)}
-                        placeholder="Nama lengkap sesuai data madrasah"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>E-mail</Label>
+                      <Label>E-mail Pengguna (Terdaftar)</Label>
                       <Input
                         type="email"
                         required
@@ -268,14 +268,12 @@ function HalamanPengguna() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label>Kata Sandi Awal</Label>
+                      <Label>Nama Lengkap Baru</Label>
                       <Input
-                        type="password"
                         required
-                        minLength={6}
-                        value={passwordBaru}
-                        onChange={(e) => setPasswordBaru(e.target.value)}
-                        placeholder="Minimal 6 karakter"
+                        value={namaBaru}
+                        onChange={(e) => setNamaBaru(e.target.value)}
+                        placeholder="Nama lengkap sesuai data madrasah"
                       />
                     </div>
                     <div className="space-y-1">
@@ -299,14 +297,13 @@ function HalamanPengguna() {
                       </Button>
                       <Button type="submit" disabled={loadingAksi}>
                         {loadingAksi && <Loader2 className="size-4 animate-spin mr-2" />}
-                        Simpan Pengguna
+                        Simpan Perubahan
                       </Button>
                     </div>
                   </form>
                 </DialogContent>
               </Dialog>
 
-              {/* Dialog Import Excel */}
               <Dialog open={dialogImportBuka} onOpenChange={setDialogImportBuka}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="gap-2">
@@ -315,12 +312,12 @@ function HalamanPengguna() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Import Pengguna dari Excel</DialogTitle>
+                    <DialogTitle>Sinkronisasi Pengguna dari Excel</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleImportExcel} className="space-y-4 pt-2">
                     <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground space-y-1">
                       <p className="font-semibold text-foreground">Format Kolom Excel (.xlsx):</p>
-                      <p>Pastikan baris header memiliki kolom: <code className="text-indigo-600 font-mono">nama</code>, <code className="text-indigo-600 font-mono">email</code>, <code className="text-indigo-600 font-mono">password</code>, dan <code className="text-indigo-600 font-mono">role</code> (admin / kepala_madrasah / supervisor / guru).</p>
+                      <p>Pastikan kolom memuat: <code className="text-indigo-600 font-mono">email</code>, <code className="text-indigo-600 font-mono">nama</code>, dan <code className="text-indigo-600 font-mono">role</code>.</p>
                     </div>
                     <div className="space-y-1">
                       <Label>Pilih File Excel</Label>
@@ -337,7 +334,7 @@ function HalamanPengguna() {
                       </Button>
                       <Button type="submit" disabled={loadingAksi || !fileExcel}>
                         {loadingAksi && <Loader2 className="size-4 animate-spin mr-2" />}
-                        <Upload className="size-4 mr-2" /> Unggah & Proses
+                        <Upload className="size-4 mr-2" /> Unggah & Sinkronkan
                       </Button>
                     </div>
                   </form>
@@ -346,7 +343,6 @@ function HalamanPengguna() {
             </div>
           </div>
 
-          {/* Tabel Pengguna */}
           {data.pengguna.length === 0 ? (
             <EmptyState title="Belum ada akun pengguna" />
           ) : (
@@ -389,8 +385,8 @@ function HalamanPengguna() {
                         <TableCell>
                           <div className="flex flex-col gap-2">
                             {guruTertaut && <Badge variant="secondary">Guru: {guruTertaut.full_name}</Badge>}
-                            {supTertaut && (
-                              <Badge variant="secondary">Supervisor: {supTertaut.full_name}</Badge>
+                            {supTertauth && (
+                              <Badge variant="secondary">Supervisor: {supTertauth.full_name}</Badge>
                             )}
                             <Select
                               value=""
