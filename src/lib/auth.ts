@@ -59,7 +59,7 @@ async function fetchCurrentUser(): Promise<CurrentUser | null> {
     fullName: profileData?.full_name || (user.email ?? "").split("@")[0] || "Administrator",
     nip: profileData?.nip ?? null,
     phone: profileData?.phone ?? null,
-    role: (roleData?.role as AppRole | undefined) ?? "admin", // Default aman agar hak akses admin selalu terbaca
+    role: (roleData?.role as AppRole | undefined) ?? null,
     teacherId: teacherData?.id ?? null,
     supervisorId: supervisorData?.id ?? null,
   };
