@@ -29,11 +29,7 @@ export type ListInput = {
   all?: boolean;
 };
 
-type AdminClient = Awaited<
-  ReturnType<typeof import("@/integrations/supabase/client.server").getAdmin>
->;
-
-async function getAdminClient() {
+async function getAdminClient(): Promise<any> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin;
 }
