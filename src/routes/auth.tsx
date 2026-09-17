@@ -182,7 +182,7 @@ const { data: daftarPengguna } = useQuery({
                       <SelectContent className="max-h-72">
                         {daftarPengguna?.map((p) => (
                           <SelectItem key={p.id} value={p.email ?? ""}>
-                            {p.full_name} ({p.email})
+                            {p.full_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
