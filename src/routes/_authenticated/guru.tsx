@@ -84,116 +84,251 @@ function HalamanGuru() {
     },
   });
 
-  async function tambahGuru(e: React.FormEvent) {
-    e.preventDefault();
-    if (!namaGuru.trim()) {
-      toast.error("Nama guru wajib diisi.");
+async function tambahGuru(e: React.FormEvent) {
+  e.preventDefault();
+
+  if (!namaGuru.trim()) {
+    toast.error("Nama guru wajib diisi.");
+    return;
+  }
+
+  setLoadingAksi(true);
+
+  try {
+    /*
+     * Tahap 1:
+     * Buat data guru saja.
+     * Pembuatan akun Auth dilakukan melalui Edge Function.
+     */
+    const { data: newT, error: errTeacher } = await supabase
+      .from("teachers")
+      .insert({
+        full_name: namaGuru.trim(),
+        nip: nipGuru.trim() || null,
+        is_active: true,
+      })
+      .select("id, full_name, nip")
+      .single();
+
+    if (errTeacher || !newT) {
+      throw new Error(
+        errTeacher?.message ?? "Data guru gagal dibuat.",
+      );
+    }
+
+    /*
+     * Tahap 2:
+     * Panggil server-side provisioning.
+     */
+    const { data: result, error: functionError } =
+      await supabase.functions.invoke("provision-teacher-accounts", {
+        body: {
+          teacherIds: [newT.id],
+        },
+      });
+
+    if (functionError) {
+      throw new Error(functionError.message);
+    }
+
+    const failed = result?.accounts?.find(
+      (account: { status: string }) => account.status === "failed",
+    );
+
+    if (failed) {
+      throw new Error(
+        failed.message ?? "Akun guru gagal dibuat.",
+      );
+    }
+
+    const account = result?.accounts?.find(
+      (item: { teacher_id: string }) => item.teacher_id === newT.id,
+    );
+
+    await logAudit("create_teacher", {
+      description: `Admin menambahkan guru dan akun portal: ${newT.full_name}`,
+    });
+
+    toast.success("Data guru dan akun portal berhasil dibuat.");
+
+    if (account?.email && account?.password) {
+      toast.info(
+        `Akun: ${account.email} | Password awal: ${account.password}`,
+        {
+          duration: 15000,
+        },
+      );
+    }
+
+    setDialogTambahBuka(false);
+    setNamaGuru("");
+    setNipGuru("");
+
+    queryClient.invalidateQueries({
+      queryKey: ["daftar-guru"],
+    });
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Terjadi kesalahan saat membuat akun guru.";
+
+    toast.error("Gagal menambah guru: " + message);
+  } finally {
+    setLoadingAksi(false);
+  }
+}
+
+async function generateAkunMassal() {
+  setLoadingAksi(true);
+
+  try {
+    const { data: semuaGuru, error: fetchErr } = await supabase
+      .from("teachers")
+      .select("id, full_name, nip, user_id")
+      .eq("is_active", true);
+
+    if (fetchErr) {
+      throw fetchErr;
+    }
+
+    const teachersWithoutUser = (semuaGuru ?? []).filter(
+      (teacher) => !teacher.user_id,
+    );
+
+    if (teachersWithoutUser.length === 0) {
+      toast.info("Semua guru sudah memiliki akun login.");
+      setDialogKonfirmasiBuka(false);
       return;
     }
-    setLoadingAksi(true);
 
-    try {
-      const { data: newT, error: errTeacher } = await supabase
-        .from("teachers")
-        .insert({
-          full_name: namaGuru.trim(),
-          nip: nipGuru.trim() || null,
-          is_active: true,
-        })
-        .select("id")
-        .single();
+    const teacherIds = teachersWithoutUser.map(
+      (teacher) => teacher.id,
+    );
 
-      if (errTeacher) throw errTeacher;
-
-      const cleanName = namaGuru.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const virtualEmail = `guru_${cleanName}_${Date.now().toString().slice(-4)}@mtsannur1.local`;
-
-      const { data: newProf } = await supabase
-        .from("profiles")
-        .insert({
-          full_name: namaGuru.trim(),
-          email: virtualEmail,
-          nip: nipGuru.trim() || null,
-        })
-        .select("id")
-        .single();
-
-      if (newProf && newT) {
-        await supabase.from("teachers").update({ user_id: newProf.id }).eq("id", newT.id);
-        await supabase.rpc("admin_set_role", { _user_id: newProf.id, _role: "guru" });
-      }
-
-      await logAudit("create_teacher", { description: `Admin menambahkan guru: ${namaGuru}` });
-      toast.success("Data guru dan akun portal berhasil dibuat.");
-      setDialogTambahBuka(false);
-      setNamaGuru("");
-      setNipGuru("");
-      queryClient.invalidateQueries({ queryKey: ["daftar-guru"] });
-    } catch (err: any) {
-      toast.error("Gagal menambah guru: " + err.message);
-    } finally {
-      setLoadingAksi(false);
-    }
-  }
-
-// Fungsi Generate Akun Massal yang Tangguh & Diperbaiki
-// Fungsi Generate Akun Massal (Sesuai Skema Database yang Ada)
-  async function generateAkunMassal() {
-    setLoadingAksi(true);
-
-    try {
-      // Ambil seluruh guru
-      const { data: semuaGuru, error: fetchErr } = await supabase
-        .from("teachers")
-        .select("id, full_name, nip, user_id");
-
-      if (fetchErr) throw fetchErr;
-
-      // Filter guru yang user_id-nya masih kosong
-      const teachersWithoutUser = (semuaGuru ?? []).filter(
-        (t) => !t.user_id || String(t.user_id).trim() === "" || String(t.user_id).trim() === "null"
+    const { data: result, error: functionError } =
+      await supabase.functions.invoke(
+        "provision-teacher-accounts",
+        {
+          body: {
+            teacherIds,
+          },
+        },
       );
 
-      if (!teachersWithoutUser || teachersWithoutUser.length === 0) {
-        toast.info("Semua guru sudah memiliki akun login yang aktif.");
-        setLoadingAksi(false);
-        setDialogKonfirmasiBuka(false);
-        return;
-      }
-
-      let count = 0;
-      for (const t of teachersWithoutUser) {
-        // PERBAIKAN: Hapus referensi ke kolom "email" karena tidak ada di tabel profiles
-        const { data: newProf, error: pErr } = await supabase
-          .from("profiles")
-          .insert({
-            // Untuk mematuhi UUID auth supabase secara dummy (jika tipe ID adalah UUID)
-            id: crypto.randomUUID(), 
-            full_name: t.full_name,
-            nip: t.nip,
-            is_active: true,
-          })
-          .select("id")
-          .single();
-
-        if (!pErr && newProf) {
-          // Tautkan user_id ke tabel teachers
-          await supabase.from("teachers").update({ user_id: newProf.id }).eq("id", t.id);
-          // Set peran sebagai guru
-          await supabase.rpc("admin_set_role", { _user_id: newProf.id, _role: "guru" });
-          count++;
-        }
-      }
-
-      toast.success(`Berhasil mengenerate ${count} akun login untuk guru.`);
-      setDialogKonfirmasiBuka(false);
-      queryClient.invalidateQueries({ queryKey: ["daftar-guru"] });
-    } catch (err: any) {
-      toast.error("Gagal mengenerate akun: " + err.message);
-    } finally {
-      setLoadingAksi(false);
+    if (functionError) {
+      throw new Error(functionError.message);
     }
+
+    const created =
+      result?.summary?.created ?? 0;
+
+    const failed =
+      result?.summary?.failed ?? 0;
+
+    const alreadyLinked =
+      result?.summary?.already_linked ?? 0;
+
+    const failedAccounts =
+      (result?.accounts ?? []).filter(
+        (account: { status: string }) =>
+          account.status === "failed",
+      );
+
+    if (failed > 0) {
+      const detail = failedAccounts
+        .slice(0, 3)
+        .map(
+          (account: {
+            full_name: string;
+            message?: string;
+          }) =>
+            `${account.full_name}: ${
+              account.message ?? "gagal"
+            }`,
+        )
+        .join("\n");
+
+      toast.error(
+        `Pembuatan akun selesai dengan ${failed} kegagalan.\n${detail}`,
+        {
+          duration: 12000,
+        },
+      );
+    }
+
+    if (created > 0) {
+      toast.success(
+        `Berhasil membuat ${created} akun guru.`,
+        {
+          duration: 8000,
+        },
+      );
+    }
+
+    if (alreadyLinked > 0) {
+      toast.info(
+        `${alreadyLinked} guru sudah terhubung dengan akun.`,
+      );
+    }
+
+    /*
+     * Tampilkan kredensial hanya sekali kepada administrator.
+     * Administrator dapat menyalinnya dan membagikannya kepada guru.
+     */
+    const createdAccounts =
+      (result?.accounts ?? []).filter(
+        (account: {
+          status: string;
+          email?: string;
+          password?: string | null;
+        }) =>
+          account.status === "created" &&
+          account.email &&
+          account.password,
+      );
+
+    if (createdAccounts.length > 0) {
+      console.table(
+        createdAccounts.map(
+          (account: {
+            full_name: string;
+            email: string;
+            password: string;
+          }) => ({
+            Guru: account.full_name,
+            Email: account.email,
+            "Password Awal": account.password,
+          }),
+        ),
+      );
+
+      toast.info(
+        `${createdAccounts.length} kredensial akun dibuat. Lihat console untuk detail sementara.`,
+        {
+          duration: 10000,
+        },
+      );
+    }
+
+    setDialogKonfirmasiBuka(false);
+
+    queryClient.invalidateQueries({
+      queryKey: ["daftar-guru"],
+    });
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : "Terjadi kesalahan saat sinkronisasi akun.";
+
+    toast.error(
+      "Gagal mengenerate akun: " + message,
+    );
+  } finally {
+    setLoadingAksi(false);
   }
+}
 
   async function downloadTemplate() {
     const rows = [
@@ -206,61 +341,158 @@ function HalamanGuru() {
     toast.success("Template berhasil diunduh.");
   }
 
-  async function handleImport(e: React.FormEvent) {
-    e.preventDefault();
-    if (!fileExcel) return;
-    setLoadingAksi(true);
+async function handleImport(e: React.FormEvent) {
+  e.preventDefault();
 
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
-        const ws = wb.Sheets[wb.SheetNames[0]!];
-        const rows = XLSX.utils.sheet_to_json<any>(ws);
+  if (!fileExcel) {
+    toast.error("Pilih file Excel terlebih dahulu.");
+    return;
+  }
 
-        let count = 0;
-        for (const row of rows) {
-          const name = row.Nama_Lengkap || row.nama || row.full_name;
-          const nip = row.NIP || row.nip || "";
-          if (!name) continue;
+  setLoadingAksi(true);
 
-          const { data: tData } = await supabase
-            .from("teachers")
-            .insert({ full_name: String(name).trim(), nip: String(nip).trim() || null, is_active: true })
-            .select("id")
-            .single();
+  const reader = new FileReader();
 
-          if (tData) {
-            const cleanName = String(name).toLowerCase().replace(/[^a-z0-9]/g, "");
-            const virtualEmail = `guru_${cleanName}_${Math.floor(Math.random() * 9000 + 1000)}@mtsannur1.local`;
+  reader.onload = async (evt) => {
+    try {
+      const bstr = evt.target?.result;
 
-            const { data: pData } = await supabase
-              .from("profiles")
-              .insert({ full_name: String(name).trim(), email: virtualEmail, nip: String(nip).trim() || null })
-              .select("id")
-              .single();
+      if (!bstr) {
+        throw new Error("File Excel tidak dapat dibaca.");
+      }
 
-            if (pData) {
-              await supabase.from("teachers").update({ user_id: pData.id }).eq("id", tData.id);
-              await supabase.rpc("admin_set_role", { _user_id: pData.id, _role: "guru" });
-            }
-            count++;
-          }
+      const wb = XLSX.read(bstr, {
+        type: "binary",
+      });
+
+      const sheetName = wb.SheetNames[0];
+
+      if (!sheetName) {
+        throw new Error("Sheet Excel tidak ditemukan.");
+      }
+
+      const ws = wb.Sheets[sheetName];
+
+      const rows = XLSX.utils.sheet_to_json<{
+        Nama_Lengkap?: string;
+        nama?: string;
+        full_name?: string;
+        NIP?: string | number;
+        nip?: string | number;
+      }>(ws);
+
+      if (rows.length === 0) {
+        throw new Error("File Excel tidak memiliki data.");
+      }
+
+      const teacherIds: string[] = [];
+      let imported = 0;
+
+      for (const row of rows) {
+        const name =
+          row.Nama_Lengkap ??
+          row.nama ??
+          row.full_name;
+
+        const nip =
+          row.NIP ??
+          row.nip ??
+          "";
+
+        if (!name || !String(name).trim()) {
+          continue;
         }
 
-        toast.success(`Berhasil mengimpor ${count} data guru beserta akunnya.`);
-        setDialogImportBuka(false);
-        setFileExcel(null);
-        queryClient.invalidateQueries({ queryKey: ["daftar-guru"] });
-      } catch (err: any) {
-        toast.error("Gagal import: " + err.message);
-      } finally {
-        setLoadingAksi(false);
+        const { data: teacher, error } = await supabase
+          .from("teachers")
+          .insert({
+            full_name: String(name).trim(),
+            nip: String(nip).trim() || null,
+            is_active: true,
+          })
+          .select("id")
+          .single();
+
+        if (error || !teacher) {
+          throw new Error(
+            `Gagal mengimpor guru "${String(name)}": ${
+              error?.message ?? "data tidak terbentuk"
+            }`,
+          );
+        }
+
+        teacherIds.push(teacher.id);
+        imported++;
       }
-    };
-    reader.readAsBinaryString(fileExcel);
-  }
+
+      if (teacherIds.length === 0) {
+        throw new Error(
+          "Tidak ada data guru valid yang dapat diimpor.",
+        );
+      }
+
+      /*
+       * Setelah seluruh teacher berhasil dibuat,
+       * buat akun Auth secara server-side sekaligus.
+       */
+      const {
+        data: result,
+        error: functionError,
+      } = await supabase.functions.invoke(
+        "provision-teacher-accounts",
+        {
+          body: {
+            teacherIds,
+          },
+        },
+      );
+
+      if (functionError) {
+        throw new Error(functionError.message);
+      }
+
+      const created =
+        result?.summary?.created ?? 0;
+
+      const failed =
+        result?.summary?.failed ?? 0;
+
+      toast.success(
+        `Import ${imported} guru selesai. ${created} akun portal berhasil dibuat.`,
+        {
+          duration: 8000,
+        },
+      );
+
+      if (failed > 0) {
+        toast.error(
+          `${failed} akun gagal dibuat. Periksa detail hasil provisioning.`,
+          {
+            duration: 10000,
+          },
+        );
+      }
+
+      setDialogImportBuka(false);
+      setFileExcel(null);
+
+      queryClient.invalidateQueries({
+        queryKey: ["daftar-guru"],
+      });
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan saat import.";
+
+      toast.error("Gagal import: " + message);
+    } finally {
+      setLoadingAksi(false);
+    }
+  };
+
+  reader.readAsBinaryString(fileExcel);
+}
 
   const hasil = useMemo(() => {
     const q = cari.trim().toLowerCase();
