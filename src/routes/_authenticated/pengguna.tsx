@@ -104,7 +104,6 @@ function HalamanPengguna() {
     setLoadingAksi(true);
 
     try {
-      // Memastikan profil tercatat dan terbarui di database
       const { data: existingProfile } = await supabase
         .from("profiles")
         .select("id")
@@ -385,8 +384,8 @@ function HalamanPengguna() {
                         <TableCell>
                           <div className="flex flex-col gap-2">
                             {guruTertaut && <Badge variant="secondary">Guru: {guruTertaut.full_name}</Badge>}
-                            {supTertauth && (
-                              <Badge variant="secondary">Supervisor: {supTertauth.full_name}</Badge>
+                            {supTertaut && (
+                              <Badge variant="secondary">Supervisor: {supTertaut.full_name}</Badge>
                             )}
                             <Select
                               value=""
@@ -397,7 +396,7 @@ function HalamanPengguna() {
                                 <SelectValue placeholder="Pilih data guru / supervisor…" />
                               </SelectTrigger>
                               <SelectContent className="max-h-72">
-                                {data.supervisor.map((s) => (
+                                {data.supervisor.app?.length !== 0 && data.supervisor.map((s) => (
                                   <SelectItem key={"s" + s.id} value={"supervisor:" + s.id}>
                                     Supervisor — {s.full_name}
                                   </SelectItem>
