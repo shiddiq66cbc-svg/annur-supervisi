@@ -6,7 +6,6 @@ import { logAudit, pesanKesalahan } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
@@ -30,8 +29,6 @@ function HalamanAuth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [nama, setNama] = useState("");
-  const [mode, setMode] = useState<"masuk" | "daftar">("masuk");
   const [lupa, setLupa] = useState(false);
 
   useEffect(() => {
@@ -51,38 +48,6 @@ function HalamanAuth() {
     }
     await logAudit("login", { description: "Pengguna masuk ke portal" });
     toast.success("Berhasil masuk.");
-    navigate({ to: "/dashboard", replace: true });
-  }
-
-  async function daftar(e: React.FormEvent) {
-    e.preventDefault();
-    if (nama.trim().length < 3) {
-      toast.error("Nama lengkap wajib diisi minimal 3 karakter.");
-      return;
-    }
-    if (password.length < 8) {
-      toast.error("Kata sandi minimal 8 karakter.");
-      return;
-    }
-    setLoading(true);
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        emailRedirectTo: window.location.origin + "/auth",
-        data: { full_name: nama.trim() },
-      },
-    });
-    setLoading(false);
-    if (error) {
-      toast.error(pesanKesalahan(error));
-      return;
-    }
-    if (!data.session) {
-      toast.success("Pendaftaran berhasil. Silakan periksa e-mail Anda untuk konfirmasi akun.");
-      setMode("masuk");
-      return;
-    }
     navigate({ to: "/dashboard", replace: true });
   }
 
@@ -114,8 +79,7 @@ function HalamanAuth() {
           Cinagara – Malangbong – Garut · Tahun Pelajaran 2026/2027
         </p>
         <p className="mt-6 max-w-md text-sm opacity-85">
-          Gunakan akun madrasah Anda. Peran akses (Administrator, Kepala Madrasah, Supervisor
-          Akademik, atau Guru) ditetapkan oleh Administrator sistem.
+          Gunakan akun madrasah Anda. Pembuatan akun dan penetapan peran akses (Administrator, Kepala Madrasah, Supervisor Akademik, atau Guru) dikelola sepenuhnya oleh Administrator sistem.
         </p>
       </div>
 
@@ -153,98 +117,51 @@ function HalamanAuth() {
               </Button>
             </form>
           ) : (
-            <Tabs value={mode} onValueChange={(v) => setMode(v as "masuk" | "daftar")} className="mt-6">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="masuk">Masuk</TabsTrigger>
-                <TabsTrigger value="daftar">Daftar Akun</TabsTrigger>
-              </TabsList>
+            <div className="mt-6 rounded-xl border bg-card p-6 shadow-sm">
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold">Masuk ke Portal</h2>
+                <p className="text-sm text-muted-foreground">
+                  Silakan masukkan e-mail dan kata sandi Anda.
+                </p>
+              </div>
 
-              <TabsContent value="masuk">
-                <form onSubmit={masuk} className="space-y-4 rounded-xl border bg-card p-6 shadow-sm">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">E-mail</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      required
-                      autoComplete="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="nama@madrasah.sch.id"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Kata Sandi</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      required
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading && <Loader2 className="size-4 animate-spin" />}
-                    Masuk
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={() => setLupa(true)}
-                    className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    Lupa kata sandi?
-                  </button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="daftar">
-                <form onSubmit={daftar} className="space-y-4 rounded-xl border bg-card p-6 shadow-sm">
-                  <div className="space-y-2">
-                    <Label htmlFor="nama">Nama Lengkap</Label>
-                    <Input
-                      id="nama"
-                      required
-                      minLength={3}
-                      value={nama}
-                      onChange={(e) => setNama(e.target.value)}
-                      placeholder="Nama sesuai data madrasah"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email-daftar">E-mail</Label>
-                    <Input
-                      id="email-daftar"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password-daftar">Kata Sandi</Label>
-                    <Input
-                      id="password-daftar"
-                      type="password"
-                      required
-                      minLength={8}
-                      autoComplete="new-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">Minimal 8 karakter.</p>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading && <Loader2 className="size-4 animate-spin" />}
-                    Daftar
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Akun baru belum memiliki peran. Administrator sistem akan menetapkan peran akses
-                    Anda.
-                  </p>
-                </form>
-              </TabsContent>
-            </Tabs>
+              <form onSubmit={masuk} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="nama@madrasah.sch.id"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Kata Sandi</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading && <Loader2 className="size-4 animate-spin" />}
+                  Masuk
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setLupa(true)}
+                  className="w-full text-center text-sm text-muted-foreground hover:text-foreground pt-2"
+                >
+                  Lupa kata sandi?
+                </button>
+              </form>
+            </div>
           )}
         </div>
       </div>
