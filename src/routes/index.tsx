@@ -43,7 +43,8 @@ function Beranda() {
           </div>
           <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-5xl">
             Portal Supervisi Akademik
-          </h1><br>
+          </h1>
+          <div className="h-3" />
           <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent">
             Madrasah Tsanawiyah Annur 1
           </p>
