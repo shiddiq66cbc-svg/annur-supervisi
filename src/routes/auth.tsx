@@ -7,6 +7,7 @@ import { logAudit, pesanKesalahan } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -27,8 +28,10 @@ export const Route = createFileRoute("/auth")({
 function HalamanAuth() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
   const [selectedEmail, setSelectedEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [modeLogin, setModeLogin] = useState<"dropdown" | "manual">("dropdown");
   const [lupa, setLupa] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
@@ -38,7 +41,6 @@ function HalamanAuth() {
     });
   }, [navigate]);
 
-  // Mengambil daftar profil/pengguna yang ada di database untuk pilihan dropdown
   const { data: daftarPengguna } = useQuery({
     queryKey: ["auth-users-dropdown"],
     queryFn: async () => {
@@ -53,14 +55,20 @@ function HalamanAuth() {
 
   async function masuk(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedEmail) {
-      toast.error("Silakan pilih nama Anda terlebih dahulu.");
+    const targetEmail = modeLogin === "dropdown" ? selectedEmail : emailInput;
+
+    if (!targetEmail) {
+      toast.error(
+        modeLogin === "dropdown"
+          ? "Silakan pilih nama Anda terlebih dahulu."
+          : "Silakan masukkan e-mail Anda."
+      );
       return;
     }
 
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({
-      email: selectedEmail.trim(),
+      email: targetEmail.trim(),
       password,
     });
     setLoading(false);
@@ -103,7 +111,7 @@ function HalamanAuth() {
           Cinagara – Malangbong – Garut · Tahun Pelajaran 2026/2027
         </p>
         <p className="mt-6 max-w-md text-sm opacity-85">
-          Pilih nama Anda dari daftar, masukkan kata sandi, dan masuk ke sistem tanpa perlu menghafal e-mail.
+          Guru dapat memilih nama dari daftar, sementara Administrator atau Kepala Madrasah dapat masuk menggunakan e-mail terdaftar.
         </p>
       </div>
 
@@ -142,29 +150,54 @@ function HalamanAuth() {
             </form>
           ) : (
             <div className="mt-6 rounded-xl border bg-card p-6 shadow-sm">
-              <div className="mb-6">
+              <div className="mb-4">
                 <h2 className="text-lg font-semibold">Masuk ke Portal</h2>
                 <p className="text-sm text-muted-foreground">
-                  Pilih nama Anda dari daftar di bawah ini.
+                  Pilih metode masuk yang sesuai dengan akun Anda.
                 </p>
               </div>
 
+              <Tabs
+                value={modeLogin}
+                onValueChange={(v) => setModeLogin(v as "dropdown" | "manual")}
+                className="mb-4"
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="dropdown">Pilih Nama (Guru)</TabsTrigger>
+                  <TabsTrigger value="manual">E-mail (Admin/Kepala)</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
               <form onSubmit={masuk} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Pilih Nama Pengguna / Guru</Label>
-                  <Select value={selectedEmail} onValueChange={setSelectedEmail}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="-- Pilih Nama Anda --" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-72">
-                      {daftarPengguna?.map((p) => (
-                        <SelectItem key={p.id} value={p.email ?? ""}>
-                          {p.full_name} ({p.email})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {modeLogin === "dropdown" ? (
+                  <div className="space-y-2">
+                    <Label>Pilih Nama Guru / Pengguna</Label>
+                    <Select value={selectedEmail} onValueChange={setSelectedEmail}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="-- Pilih Nama Anda --" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {daftarPengguna?.map((p) => (
+                          <SelectItem key={p.id} value={p.email ?? ""}>
+                            {p.full_name} ({p.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="email-manual">E-mail Administrator / Pengguna</Label>
+                    <Input
+                      id="email-manual"
+                      type="email"
+                      required
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      placeholder="shiddiq66.cbc@gmail.com"
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="password">Kata Sandi</Label>
