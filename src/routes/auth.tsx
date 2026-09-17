@@ -1,25 +1,25 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { logAudit, pesanKesalahan } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
   head: () => ({
-    meta: [
-      { title: "Masuk — Portal Supervisi Akademik MTs Annur 1" },
-      {
-        name: "description",
-        content: "Halaman masuk pengguna Portal Supervisi Akademik MTs Annur 1.",
-      },
-      { property: "og:title", content: "Masuk — Portal Supervisi Akademik MTs Annur 1" },
-      { property: "og:description", content: "Masuk ke Portal Supervisi Akademik MTs Annur 1." },
-    ],
+    meta: [{ title: "Masuk — Portal Supervisi Akademik MTs Annur 1" }],
   }),
   component: HalamanAuth,
 });
@@ -27,9 +27,10 @@ export const Route = createFileRoute("/auth")({
 function HalamanAuth() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState("");
+  const [selectedEmail, setSelectedEmail] = useState("");
   const [password, setPassword] = useState("");
   const [lupa, setLupa] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -37,15 +38,38 @@ function HalamanAuth() {
     });
   }, [navigate]);
 
+  // Mengambil daftar profil/pengguna yang ada di database untuk pilihan dropdown
+  const { data: daftarPengguna } = useQuery({
+    queryKey: ["auth-users-dropdown"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .order("full_name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   async function masuk(e: React.FormEvent) {
     e.preventDefault();
+    if (!selectedEmail) {
+      toast.error("Silakan pilih nama Anda terlebih dahulu.");
+      return;
+    }
+
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email: selectedEmail.trim(),
+      password,
+    });
     setLoading(false);
+
     if (error) {
       toast.error(pesanKesalahan(error));
       return;
     }
+
     await logAudit("login", { description: "Pengguna masuk ke portal" });
     toast.success("Berhasil masuk.");
     navigate({ to: "/dashboard", replace: true });
@@ -54,7 +78,7 @@ function HalamanAuth() {
   async function kirimReset(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
       redirectTo: window.location.origin + "/reset-password",
     });
     setLoading(false);
@@ -79,7 +103,7 @@ function HalamanAuth() {
           Cinagara – Malangbong – Garut · Tahun Pelajaran 2026/2027
         </p>
         <p className="mt-6 max-w-md text-sm opacity-85">
-          Gunakan akun madrasah Anda. Pembuatan akun dan penetapan peran akses (Administrator, Kepala Madrasah, Supervisor Akademik, atau Guru) dikelola sepenuhnya oleh Administrator sistem.
+          Pilih nama Anda dari daftar, masukkan kata sandi, dan masuk ke sistem tanpa perlu menghafal e-mail.
         </p>
       </div>
 
@@ -103,8 +127,8 @@ function HalamanAuth() {
                   id="reset-email"
                   type="email"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
                   placeholder="nama@madrasah.sch.id"
                 />
               </div>
@@ -121,23 +145,27 @@ function HalamanAuth() {
               <div className="mb-6">
                 <h2 className="text-lg font-semibold">Masuk ke Portal</h2>
                 <p className="text-sm text-muted-foreground">
-                  Silakan masukkan e-mail dan kata sandi Anda.
+                  Pilih nama Anda dari daftar di bawah ini.
                 </p>
               </div>
 
               <form onSubmit={masuk} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="nama@madrasah.sch.id"
-                  />
+                  <Label>Pilih Nama Pengguna / Guru</Label>
+                  <Select value={selectedEmail} onValueChange={setSelectedEmail}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="-- Pilih Nama Anda --" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {daftarPengguna?.map((p) => (
+                        <SelectItem key={p.id} value={p.email ?? ""}>
+                          {p.full_name} ({p.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="password">Kata Sandi</Label>
                   <Input
@@ -147,12 +175,15 @@ function HalamanAuth() {
                     autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
                   />
                 </div>
+
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="size-4 animate-spin" />}
                   Masuk
                 </Button>
+
                 <button
                   type="button"
                   onClick={() => setLupa(true)}
