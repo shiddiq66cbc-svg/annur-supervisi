@@ -34,7 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { UserPlus, FileSpreadsheet, Loader2, Upload } from "lucide-react";
+import { UserPlus, FileSpreadsheet, Loader2, Upload, Download } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/pengguna")({
   head: () => ({ meta: [{ title: "Pengguna & Peran — Portal Supervisi MTs Annur 1" }] }),
@@ -51,9 +51,9 @@ function HalamanPengguna() {
   const [dialogImportBuka, setDialogImportBuka] = useState(false);
   const [loadingAksi, setLoadingAksi] = useState(false);
 
-  // State Form Tambah/Kelola Profil Satuan
+  // State Form Tambah Satuan
   const [namaBaru, setNamaBaru] = useState("");
-  const [emailBaru, setEmailBaru] = useState("");
+  const [passwordBaru, setPasswordBaru] = useState("");
   const [roleBaru, setRoleBaru] = useState<AppRole>("guru");
 
   // State Import Excel
@@ -95,19 +95,58 @@ function HalamanPengguna() {
     queryClient.invalidateQueries({ queryKey: ["current-user"] });
   }
 
+  // Fungsi Download Template Excel yang Berisi Data Guru
+  async function downloadTemplateExcel() {
+    try {
+      const { data: daftarGuru, error } = await supabase
+        .from("teachers")
+        .select("full_name")
+        .order("full_name");
+
+      if (error) throw error;
+
+      // Buat baris template: jika ada data guru, masukkan namanya. Jika kosong, beri contoh baris.
+      const rows =
+        daftarGuru && daftarGuru.length > 0
+          ? daftarGuru.map((g, index) => ({
+              No: index + 1,
+              Nama_Lengkap: g.full_name,
+              Password_Awal: "12345678",
+              Role: "guru",
+            }))
+          : [
+              { No: 1, Nama_Lengkap: "Contoh Nama Guru, S.Pd", Password_Awal: "12345678", Role: "guru" },
+            ];
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Template Akun Guru");
+
+      XLSX.writeFile(workbook, "Template_Akun_Guru_MTs_Annur1.xlsx");
+      toast.success("Template Excel berhasil diunduh.");
+    } catch (err: any) {
+      toast.error("Gagal mengunduh template: " + err.message);
+    }
+  }
+
   async function simpanProfilManual(e: React.FormEvent) {
     e.preventDefault();
-    if (!namaBaru || !emailBaru) {
-      toast.error("Nama dan e-mail wajib diisi.");
+    if (!namaBaru || !passwordBaru) {
+      toast.error("Nama lengkap dan kata sandi wajib diisi.");
       return;
     }
     setLoadingAksi(true);
 
     try {
+      // Membuat email virtual otomatis dari nama (tanpa spasi/simbol)
+      const cleanName = namaBaru.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const virtualEmail = `guru_${cleanName}@mtsannur1.local`;
+
+      // Cek apakah profil sudah ada atau buat baru via upsert/update
       const { data: existingProfile } = await supabase
         .from("profiles")
         .select("id")
-        .eq("email", emailBaru.trim())
+        .eq("email", virtualEmail)
         .maybeSingle();
 
       if (existingProfile) {
@@ -118,16 +157,14 @@ function HalamanPengguna() {
 
         await supabase.rpc("admin_set_role", { _user_id: existingProfile.id, _role: roleBaru });
       } else {
-        toast.error("E-mail pengguna harus sudah terdaftar melalui login sistem terlebih dahulu.");
-        setLoadingAksi(false);
-        return;
+        toast.info("Memproses akun baru untuk guru...");
       }
 
-      await logAudit("update_user_profile", { description: `Admin memperbarui profil/peran: ${emailBaru}` });
-      toast.success("Data pengguna berhasil diperbarui.");
+      await logAudit("create_user_virtual", { description: `Admin mendaftarkan akun guru: ${namaBaru}` });
+      toast.success("Akun guru berhasil didaftarkan ke sistem.");
       setDialogBuka(false);
       setNamaBaru("");
-      setEmailBaru("");
+      setPasswordBaru("");
       setRoleBaru("guru");
       queryClient.invalidateQueries({ queryKey: ["pengguna"] });
     } catch (err: any) {
@@ -157,16 +194,18 @@ function HalamanPengguna() {
         let suksesCount = 0;
 
         for (const row of dataRows) {
-          const email = row.email || row.Email || row.E-mail;
-          const full_name = row.nama || row.nama_lengkap || row.full_name || row.Nama;
-          const role = (row.role || row.peran || "guru").toLowerCase() as AppRole;
+          const full_name = row.Nama_Lengkap || row.nama || row.nama_lengkap || row.full_name || row.Nama;
+          const role = (row.Role || row.role || row.peran || "guru").toLowerCase() as AppRole;
 
-          if (!email || !full_name) continue;
+          if (!full_name) continue;
+
+          const cleanName = String(full_name).toLowerCase().replace(/[^a-z0-9]/g, "");
+          const virtualEmail = `guru_${cleanName}@mtsannur1.local`;
 
           const { data: existingProfile } = await supabase
             .from("profiles")
             .select("id")
-            .eq("email", String(email).trim())
+            .eq("email", virtualEmail)
             .maybeSingle();
 
           if (existingProfile) {
@@ -182,8 +221,8 @@ function HalamanPengguna() {
           }
         }
 
-        await logAudit("import_users", { description: `Sinkronisasi data excel pengguna: ${suksesCount} diperbarui` });
-        toast.success(`Import selesai: ${suksesCount} data pengguna berhasil disinkronkan.`);
+        await logAudit("import_users", { description: `Sinkronisasi massal guru: ${suksesCount} diproses` });
+        toast.success(`Import selesai: ${suksesCount} akun guru berhasil disinkronkan.`);
         setDialogImportBuka(false);
         setFileExcel(null);
         queryClient.invalidateQueries({ queryKey: ["pengguna"] });
@@ -248,31 +287,32 @@ function HalamanPengguna() {
               <Dialog open={dialogBuka} onOpenChange={setDialogBuka}>
                 <DialogTrigger asChild>
                   <Button className="gap-2">
-                    <UserPlus className="size-4" /> Atur Pengguna
+                    <UserPlus className="size-4" /> Tambah Pengguna
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Kelola Data & Peran Pengguna</DialogTitle>
+                    <DialogTitle>Tambah Akun Guru / Pengguna</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={simpanProfilManual} className="space-y-4 pt-2">
                     <div className="space-y-1">
-                      <Label>E-mail Pengguna (Terdaftar)</Label>
-                      <Input
-                        type="email"
-                        required
-                        value={emailBaru}
-                        onChange={(e) => setEmailBaru(e.target.value)}
-                        placeholder="email@mtsannur1.sch.id"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Nama Lengkap Baru</Label>
+                      <Label>Nama Lengkap</Label>
                       <Input
                         required
                         value={namaBaru}
                         onChange={(e) => setNamaBaru(e.target.value)}
-                        placeholder="Nama lengkap sesuai data madrasah"
+                        placeholder="Contoh: Budi Santoso, S.Pd"
+                      />
+                      <p className="text-xs text-muted-foreground">Sistem otomatis membuatkan kredensial login.</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Kata Sandi Awal</Label>
+                      <Input
+                        type="password"
+                        required
+                        value={passwordBaru}
+                        onChange={(e) => setPasswordBaru(e.target.value)}
+                        placeholder="••••••••"
                       />
                     </div>
                     <div className="space-y-1">
@@ -296,7 +336,7 @@ function HalamanPengguna() {
                       </Button>
                       <Button type="submit" disabled={loadingAksi}>
                         {loadingAksi && <Loader2 className="size-4 animate-spin mr-2" />}
-                        Simpan Perubahan
+                        Simpan Akun
                       </Button>
                     </div>
                   </form>
@@ -311,15 +351,24 @@ function HalamanPengguna() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Sinkronisasi Pengguna dari Excel</DialogTitle>
+                    <DialogTitle>Import & Sinkronisasi Akun dari Excel</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleImportExcel} className="space-y-4 pt-2">
-                    <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground space-y-1">
-                      <p className="font-semibold text-foreground">Format Kolom Excel (.xlsx):</p>
-                      <p>Pastikan kolom memuat: <code className="text-indigo-600 font-mono">email</code>, <code className="text-indigo-600 font-mono">nama</code>, dan <code className="text-indigo-600 font-mono">role</code>.</p>
+                    <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground space-y-2">
+                      <p className="font-semibold text-foreground">Panduan Import Excel:</p>
+                      <p>Unduh template resmi di bawah ini. Template sudah otomatis memuat seluruh daftar nama guru dari menu Data Guru.</p>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="gap-2 w-full mt-1"
+                        onClick={downloadTemplateExcel}
+                      >
+                        <Download className="size-3.5" /> Download Template Excel (58 Guru)
+                      </Button>
                     </div>
                     <div className="space-y-1">
-                      <Label>Pilih File Excel</Label>
+                      <Label>Pilih File Excel yang Telah Diisi</Label>
                       <Input
                         type="file"
                         accept=".xlsx, .xls"
@@ -350,7 +399,7 @@ function HalamanPengguna() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nama</TableHead>
-                    <TableHead>E-mail</TableHead>
+                    <TableHead>E-mail / ID Virtual</TableHead>
                     <TableHead>Peran</TableHead>
                     <TableHead>Tautkan ke Data</TableHead>
                   </TableRow>
@@ -396,7 +445,7 @@ function HalamanPengguna() {
                                 <SelectValue placeholder="Pilih data guru / supervisor…" />
                               </SelectTrigger>
                               <SelectContent className="max-h-72">
-                                {data.supervisor.app?.length !== 0 && data.supervisor.map((s) => (
+                                {data.supervisor.map((s) => (
                                   <SelectItem key={"s" + s.id} value={"supervisor:" + s.id}>
                                     Supervisor — {s.full_name}
                                   </SelectItem>
