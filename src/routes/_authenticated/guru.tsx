@@ -136,18 +136,25 @@ function HalamanGuru() {
     }
   }
 
-  // Fungsi Generate Akun Massal dengan Modal Elegan
+// Fungsi Generate Akun Massal yang Tangguh & Diperbaiki
   async function generateAkunMassal() {
     setLoadingAksi(true);
 
     try {
-      const { data: teachersWithoutUser } = await supabase
+      // Ambil seluruh guru tanpa pembatasan is(user_id, null) di database
+      const { data: semuaGuru, error: fetchErr } = await supabase
         .from("teachers")
-        .select("id, full_name, nip")
-        .is("user_id", null);
+        .select("id, full_name, nip, user_id");
+
+      if (fetchErr) throw fetchErr;
+
+      // Filter di JavaScript untuk guru yang user_id-nya kosong, null, atau belum ada
+      const teachersWithoutUser = (semuaGuru ?? []).filter(
+        (t) => !t.user_id || t.user_id === "" || t.user_id === "null"
+      );
 
       if (!teachersWithoutUser || teachersWithoutUser.length === 0) {
-        toast.info("Semua guru sudah memiliki akun login.");
+        toast.info("Semua guru sudah memiliki akun login yang aktif.");
         setLoadingAksi(false);
         setDialogKonfirmasiBuka(false);
         return;
@@ -158,6 +165,7 @@ function HalamanGuru() {
         const cleanName = t.full_name.toLowerCase().replace(/[^a-z0-9]/g, "");
         const virtualEmail = `guru_${cleanName}_${Math.floor(Math.random() * 9000 + 1000)}@mtsannur1.local`;
 
+        // 1. Buat profil di tabel profiles
         const { data: newProf, error: pErr } = await supabase
           .from("profiles")
           .insert({
@@ -169,7 +177,9 @@ function HalamanGuru() {
           .single();
 
         if (!pErr && newProf) {
+          // 2. Tautkan user_id ke tabel teachers
           await supabase.from("teachers").update({ user_id: newProf.id }).eq("id", t.id);
+          // 3. Tetapkan peran sebagai guru
           await supabase.rpc("admin_set_role", { _user_id: newProf.id, _role: "guru" });
           count++;
         }
