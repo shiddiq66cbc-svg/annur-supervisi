@@ -95,7 +95,7 @@ function HalamanPengguna() {
     queryClient.invalidateQueries({ queryKey: ["current-user"] });
   }
 
-  // Fungsi Download Template Excel yang Berisi Data Guru
+  // Download Template Excel yang Berisi Data Guru
   async function downloadTemplateExcel() {
     try {
       const { data: daftarGuru, error } = await supabase
@@ -105,7 +105,6 @@ function HalamanPengguna() {
 
       if (error) throw error;
 
-      // Buat baris template: jika ada data guru, masukkan namanya. Jika kosong, beri contoh baris.
       const rows =
         daftarGuru && daftarGuru.length > 0
           ? daftarGuru.map((g, index) => ({
@@ -138,26 +137,23 @@ function HalamanPengguna() {
     setLoadingAksi(true);
 
     try {
-      // Membuat email virtual otomatis dari nama (tanpa spasi/simbol)
       const cleanName = namaBaru.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const virtualEmail = `guru_${cleanName}@mtsannur1.local`;
+      const virtualEmail = `guru_${cleanName}_${Date.now().toString().slice(-4)}@mtsannur1.local`;
 
-      // Cek apakah profil sudah ada atau buat baru via upsert/update
-      const { data: existingProfile } = await supabase
+      // Buat atau masukkan profil baru ke tabel profiles
+      const { data: newProfile, error: errProfile } = await supabase
         .from("profiles")
+        .insert({
+          full_name: namaBaru.trim(),
+          email: virtualEmail,
+        })
         .select("id")
-        .eq("email", virtualEmail)
-        .maybeSingle();
+        .single();
 
-      if (existingProfile) {
-        await supabase
-          .from("profiles")
-          .update({ full_name: namaBaru.trim() })
-          .eq("id", existingProfile.id);
+      if (errProfile) throw errProfile;
 
-        await supabase.rpc("admin_set_role", { _user_id: existingProfile.id, _role: roleBaru });
-      } else {
-        toast.info("Memproses akun baru untuk guru...");
+      if (newProfile) {
+        await supabase.rpc("admin_set_role", { _user_id: newProfile.id, _role: roleBaru });
       }
 
       await logAudit("create_user_virtual", { description: `Admin mendaftarkan akun guru: ${namaBaru}` });
@@ -194,7 +190,15 @@ function HalamanPengguna() {
         let suksesCount = 0;
 
         for (const row of dataRows) {
-          const full_name = row.Nama_Lengkap || row.nama || row.nama_lengkap || row.full_name || row.Nama;
+          // Mendukung berbagai variasi penamaan kolom dari excel
+          const full_name =
+            row.Nama_Lengkap ||
+            row["Nama Lengkap"] ||
+            row.nama ||
+            row.nama_lengkap ||
+            row.full_name ||
+            row.Nama;
+
           const role = (row.Role || row.role || row.peran || "guru").toLowerCase() as AppRole;
 
           if (!full_name) continue;
@@ -202,6 +206,7 @@ function HalamanPengguna() {
           const cleanName = String(full_name).toLowerCase().replace(/[^a-z0-9]/g, "");
           const virtualEmail = `guru_${cleanName}@mtsannur1.local`;
 
+          // Cek apakah profil dengan email virtual ini sudah ada
           const { data: existingProfile } = await supabase
             .from("profiles")
             .select("id")
@@ -209,6 +214,7 @@ function HalamanPengguna() {
             .maybeSingle();
 
           if (existingProfile) {
+            // Update jika sudah ada
             await supabase
               .from("profiles")
               .update({ full_name: String(full_name).trim() })
@@ -218,11 +224,28 @@ function HalamanPengguna() {
               await supabase.rpc("admin_set_role", { _user_id: existingProfile.id, _role: role });
             }
             suksesCount++;
+          } else {
+            // Buat baru jika belum ada
+            const { data: newProf, error: errIns } = await supabase
+              .from("profiles")
+              .insert({
+                full_name: String(full_name).trim(),
+                email: virtualEmail,
+              })
+              .select("id")
+              .single();
+
+            if (!errIns && newProf) {
+              if (ROLES.includes(role)) {
+                await supabase.rpc("admin_set_role", { _user_id: newProf.id, _role: role });
+              }
+              suksesCount++;
+            }
           }
         }
 
-        await logAudit("import_users", { description: `Sinkronisasi massal guru: ${suksesCount} diproses` });
-        toast.success(`Import selesai: ${suksesCount} akun guru berhasil disinkronkan.`);
+        await logAudit("import_users", { description: `Sinkronisasi massal akun guru: ${suksesCount} diproses` });
+        toast.success(`Import selesai: ${suksesCount} akun berhasil disinkronkan ke sistem.`);
         setDialogImportBuka(false);
         setFileExcel(null);
         queryClient.invalidateQueries({ queryKey: ["pengguna"] });
