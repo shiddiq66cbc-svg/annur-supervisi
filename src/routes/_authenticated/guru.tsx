@@ -81,7 +81,7 @@ function HalamanGuru() {
     },
   });
 
-  // Fungsi Tambah Guru Satuan (Otomatis buat profil/akun virtual)
+  // Fungsi Tambah Guru Satuan
   async function tambahGuru(e: React.FormEvent) {
     e.preventDefault();
     if (!namaGuru.trim()) {
@@ -91,46 +91,18 @@ function HalamanGuru() {
     setLoadingAksi(true);
 
     try {
-      // 1. Masukkan ke tabel teachers
-      const { data: newTeacher, error: errTeacher } = await supabase
+      const { error: errTeacher } = await supabase
         .from("teachers")
         .insert({
           full_name: namaGuru.trim(),
           nip: nipGuru.trim() || null,
           is_active: true,
-        })
-        .select("id")
-        .single();
+        });
 
       if (errTeacher) throw errTeacher;
 
-      // 2. Buat profil virtual otomatis agar langsung bisa login via dropdown
-      const cleanName = namaGuru.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const virtualEmail = `guru_${cleanName}_${Date.now().toString().slice(-4)}@mtsannur1.local`;
-
-      const { data: newProfile, error: errProfile } = await supabase
-        .from("profiles")
-        .insert({
-          full_name: namaGuru.trim(),
-          email: virtualEmail,
-          nip: nipGuru.trim() || null,
-        })
-        .select("id")
-        .single();
-
-      if (!errProfile && newProfile) {
-        // Tautkan user_id ke teachers
-        await supabase
-          .from("teachers")
-          .update({ user_id: newProfile.id })
-          .eq("id", newTeacher.id);
-
-        // Set role default sebagai guru
-        await supabase.rpc("admin_set_role", { _user_id: newProfile.id, _role: "guru" });
-      }
-
       await logAudit("create_teacher", { description: `Admin menambahkan guru: ${namaGuru}` });
-      toast.success("Data guru dan akun portal berhasil dibuat.");
+      toast.success("Data guru berhasil ditambahkan.");
       setDialogTambahBuka(false);
       setNamaGuru("");
       setNipGuru("");
@@ -144,20 +116,40 @@ function HalamanGuru() {
 
   // Download Template Excel
   async function downloadTemplate() {
-    const rows = [
-      { No: 1, Nama_Lengkap: "Contoh Guru Budi, S.Pd", NIP: "198501012010011001" },
-    ];
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Data Guru");
-    XLSX.writeFile(wb, "Template_Data_Guru_MTs_Annur1.xlsx");
-    toast.success("Template berhasil diunduh.");
+    try {
+      const { data: daftarGuru } = await supabase
+        .from("teachers")
+        .select("full_name, nip")
+        .order("full_name");
+
+      const rows =
+        daftarGuru && daftarGuru.length > 0
+          ? daftarGuru.map((g, index) => ({
+              No: index + 1,
+              Nama_Lengkap: g.full_name,
+              NIP: g.nip || "",
+            }))
+          : [
+              { No: 1, Nama_Lengkap: "Contoh Guru Budi, S.Pd", NIP: "198501012010011001" },
+            ];
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Data Guru");
+      XLSX.writeFile(wb, "Template_Data_Guru_MTs_Annur1.xlsx");
+      toast.success("Template Excel berhasil diunduh.");
+    } catch (err: any) {
+      toast.error("Gagal mengunduh template: " + err.message);
+    }
   }
 
-  // Import Excel Massal
+  // Import Excel Massal dengan Parsing Tangguh
   async function handleImport(e: React.FormEvent) {
     e.preventDefault();
-    if (!fileExcel) return;
+    if (!fileExcel) {
+      toast.error("Pilih file Excel terlebih dahulu.");
+      return;
+    }
     setLoadingAksi(true);
 
     const reader = new FileReader();
@@ -168,43 +160,45 @@ function HalamanGuru() {
         const ws = wb.Sheets[wb.SheetNames[0]!];
         const rows = XLSX.utils.sheet_to_json<any>(ws);
 
+        if (!rows || rows.length === 0) {
+          toast.error("File Excel kosong atau format tidak sesuai.");
+          setLoadingAksi(false);
+          return;
+        }
+
         let count = 0;
         for (const row of rows) {
-          const name = row.Nama_Lengkap || row.nama || row.full_name;
+          const name =
+            row.Nama_Lengkap ||
+            row["Nama Lengkap"] ||
+            row.nama ||
+            row.nama_lengkap ||
+            row.full_name ||
+            row.Nama;
+
           const nip = row.NIP || row.nip || "";
+
           if (!name) continue;
 
-          // Insert ke teachers
-          const { data: tData } = await supabase
-            .from("teachers")
-            .insert({ full_name: String(name).trim(), nip: String(nip).trim() || null, is_active: true })
-            .select("id")
-            .single();
+          // Masukkan ke tabel teachers
+          const { error: insErr } = await supabase.from("teachers").insert({
+            full_name: String(name).trim(),
+            nip: nip ? String(nip).trim() : null,
+            is_active: true,
+          });
 
-          if (tData) {
-            const cleanName = String(name).toLowerCase().replace(/[^a-z0-9]/g, "");
-            const virtualEmail = `guru_${cleanName}_${Math.floor(Math.random() * 9000 + 1000)}@mtsannur1.local`;
-
-            const { data: pData } = await supabase
-              .from("profiles")
-              .insert({ full_name: String(name).trim(), email: virtualEmail, nip: String(nip).trim() || null })
-              .select("id")
-              .single();
-
-            if (pData) {
-              await supabase.from("teachers").update({ user_id: pData.id }).eq("id", tData.id);
-              await supabase.rpc("admin_set_role", { _user_id: pData.id, _role: "guru" });
-            }
+          if (!insErr) {
             count++;
           }
         }
 
-        toast.success(`Berhasil mengimpor ${count} data guru beserta akunnya.`);
+        await logAudit("import_teachers", { description: `Sinkronisasi excel guru: ${count} data diproses` });
+        toast.success(`Import selesai: ${count} data guru berhasil di-parse dan disinkronkan.`);
         setDialogImportBuka(false);
         setFileExcel(null);
         queryClient.invalidateQueries({ queryKey: ["daftar-guru"] });
       } catch (err: any) {
-        toast.error("Gagal import: " + err.message);
+        toast.error("Gagal memproses file Excel: " + err.message);
       } finally {
         setLoadingAksi(false);
       }
@@ -259,7 +253,6 @@ function HalamanGuru() {
                         onChange={(e) => setNamaGuru(e.target.value)}
                         placeholder="Contoh: Siti Aminah, S.Pd.I"
                       />
-                      <p className="text-xs text-muted-foreground">Akun portal login akan dibuatkan secara otomatis.</p>
                     </div>
                     <div className="space-y-1">
                       <Label>NIP / NUPTK (Opsional)</Label>
@@ -275,7 +268,7 @@ function HalamanGuru() {
                       </Button>
                       <Button type="submit" disabled={loadingAksi}>
                         {loadingAksi && <Loader2 className="size-4 animate-spin mr-2" />}
-                        Simpan & Buat Akun
+                        Simpan Guru
                       </Button>
                     </div>
                   </form>
@@ -296,7 +289,7 @@ function HalamanGuru() {
                   <form onSubmit={handleImport} className="space-y-4 pt-2">
                     <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground space-y-2">
                       <p className="font-semibold text-foreground">Panduan:</p>
-                      <p>Unduh template, isi daftar guru, lalu unggah kembali. Akun portal otomatis digenerate.</p>
+                      <p>Unduh template, isi daftar guru, lalu unggah kembali.</p>
                       <Button type="button" variant="secondary" size="sm" className="w-full gap-2 mt-1" onClick={downloadTemplate}>
                         <Download className="size-3.5" /> Download Template Excel
                       </Button>
@@ -316,7 +309,7 @@ function HalamanGuru() {
                       </Button>
                       <Button type="submit" disabled={loadingAksi || !fileExcel}>
                         {loadingAksi && <Loader2 className="size-4 animate-spin mr-2" />}
-                        <Upload className="size-4 mr-2" /> Unggah Data
+                        <Upload className="size-4 mr-2" /> Unggah & Sinkronkan
                       </Button>
                     </div>
                   </form>
