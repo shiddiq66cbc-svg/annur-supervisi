@@ -41,17 +41,20 @@ function HalamanAuth() {
     });
   }, [navigate]);
 
-  const { data: daftarPengguna } = useQuery({
-    queryKey: ["auth-users-dropdown"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .order("full_name");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+const { data: daftarPengguna } = useQuery({
+  queryKey: ["auth-users-dropdown"],
+  queryFn: async () => {
+    const { data, error } = await supabase.rpc(
+      "get_login_users",
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    return data ?? [];
+  },
+});
 
   async function masuk(e: React.FormEvent) {
     e.preventDefault();
