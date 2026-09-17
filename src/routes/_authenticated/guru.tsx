@@ -137,20 +137,21 @@ function HalamanGuru() {
   }
 
 // Fungsi Generate Akun Massal yang Tangguh & Diperbaiki
+// Fungsi Generate Akun Massal (Sesuai Skema Database yang Ada)
   async function generateAkunMassal() {
     setLoadingAksi(true);
 
     try {
-      // Ambil seluruh guru tanpa pembatasan is(user_id, null) di database
+      // Ambil seluruh guru
       const { data: semuaGuru, error: fetchErr } = await supabase
         .from("teachers")
         .select("id, full_name, nip, user_id");
 
       if (fetchErr) throw fetchErr;
 
-      // Filter di JavaScript untuk guru yang user_id-nya kosong, null, atau belum ada
+      // Filter guru yang user_id-nya masih kosong
       const teachersWithoutUser = (semuaGuru ?? []).filter(
-        (t) => !t.user_id || t.user_id === "" || t.user_id === "null"
+        (t) => !t.user_id || String(t.user_id).trim() === "" || String(t.user_id).trim() === "null"
       );
 
       if (!teachersWithoutUser || teachersWithoutUser.length === 0) {
@@ -162,24 +163,23 @@ function HalamanGuru() {
 
       let count = 0;
       for (const t of teachersWithoutUser) {
-        const cleanName = t.full_name.toLowerCase().replace(/[^a-z0-9]/g, "");
-        const virtualEmail = `guru_${cleanName}_${Math.floor(Math.random() * 9000 + 1000)}@mtsannur1.local`;
-
-        // 1. Buat profil di tabel profiles
+        // PERBAIKAN: Hapus referensi ke kolom "email" karena tidak ada di tabel profiles
         const { data: newProf, error: pErr } = await supabase
           .from("profiles")
           .insert({
+            // Untuk mematuhi UUID auth supabase secara dummy (jika tipe ID adalah UUID)
+            id: crypto.randomUUID(), 
             full_name: t.full_name,
-            email: virtualEmail,
             nip: t.nip,
+            is_active: true,
           })
           .select("id")
           .single();
 
         if (!pErr && newProf) {
-          // 2. Tautkan user_id ke tabel teachers
+          // Tautkan user_id ke tabel teachers
           await supabase.from("teachers").update({ user_id: newProf.id }).eq("id", t.id);
-          // 3. Tetapkan peran sebagai guru
+          // Set peran sebagai guru
           await supabase.rpc("admin_set_role", { _user_id: newProf.id, _role: "guru" });
           count++;
         }
