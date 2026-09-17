@@ -19,6 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -49,6 +51,7 @@ function HalamanGuru() {
   const [cari, setCari] = useState("");
   const [dialogTambahBuka, setDialogTambahBuka] = useState(false);
   const [dialogImportBuka, setDialogImportBuka] = useState(false);
+  const [dialogKonfirmasiBuka, setDialogKonfirmasiBuka] = useState(false);
   const [loadingAksi, setLoadingAksi] = useState(false);
 
   // Form State Tambah Satuan
@@ -81,7 +84,6 @@ function HalamanGuru() {
     },
   });
 
-  // Fungsi Tambah Guru Satuan
   async function tambahGuru(e: React.FormEvent) {
     e.preventDefault();
     if (!namaGuru.trim()) {
@@ -103,7 +105,6 @@ function HalamanGuru() {
 
       if (errTeacher) throw errTeacher;
 
-      // Buatkan profil virtual otomatis agar langsung muncul di halaman login
       const cleanName = namaGuru.toLowerCase().replace(/[^a-z0-9]/g, "");
       const virtualEmail = `guru_${cleanName}_${Date.now().toString().slice(-4)}@mtsannur1.local`;
 
@@ -135,9 +136,8 @@ function HalamanGuru() {
     }
   }
 
-  // Fungsi Otomatis Generate Akun untuk Guru yang Belum Punya Akun
+  // Fungsi Generate Akun Massal dengan Modal Elegan
   async function generateAkunMassal() {
-    if (!confirm("Buatkan akun login otomatis untuk seluruh guru yang belum memiliki akun?")) return;
     setLoadingAksi(true);
 
     try {
@@ -147,8 +147,9 @@ function HalamanGuru() {
         .is("user_id", null);
 
       if (!teachersWithoutUser || teachersWithoutUser.length === 0) {
-        toast.info("Semua guru sudah memiliki akun.");
+        toast.info("Semua guru sudah memiliki akun login.");
         setLoadingAksi(false);
+        setDialogKonfirmasiBuka(false);
         return;
       }
 
@@ -175,6 +176,7 @@ function HalamanGuru() {
       }
 
       toast.success(`Berhasil mengenerate ${count} akun login untuk guru.`);
+      setDialogKonfirmasiBuka(false);
       queryClient.invalidateQueries({ queryKey: ["daftar-guru"] });
     } catch (err: any) {
       toast.error("Gagal mengenerate akun: " + err.message);
@@ -183,7 +185,6 @@ function HalamanGuru() {
     }
   }
 
-  // Download Template Excel
   async function downloadTemplate() {
     const rows = [
       { No: 1, Nama_Lengkap: "Contoh Guru Budi, S.Pd", NIP: "198501012010011001" },
@@ -195,7 +196,6 @@ function HalamanGuru() {
     toast.success("Template berhasil diunduh.");
   }
 
-  // Import Excel Massal
   async function handleImport(e: React.FormEvent) {
     e.preventDefault();
     if (!fileExcel) return;
@@ -263,7 +263,6 @@ function HalamanGuru() {
   return (
     <AppShell title="Data Guru & Akun Portal" description="Tahun Pelajaran 2026/2027">
       <div className="space-y-4">
-        {/* Baris Pencarian & Tombol Aksi Admin */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="relative max-w-sm flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
@@ -277,7 +276,8 @@ function HalamanGuru() {
 
           {admin && (
             <div className="flex items-center gap-2">
-              <Button variant="secondary" onClick={generateAkunMassal} disabled={loadingAksi} className="gap-2">
+              {/* Tombol yang membuka Modal Konfirmasi Elegan */}
+              <Button variant="secondary" onClick={() => setDialogKonfirmasiBuka(true)} disabled={loadingAksi} className="gap-2">
                 <KeyRound className="size-4 text-indigo-600" /> Sinkronkan Akun (58 Guru)
               </Button>
 
@@ -364,6 +364,29 @@ function HalamanGuru() {
             </div>
           )}
         </div>
+
+        {/* Modal Dialog Konfirmasi Custom yang Cantik */}
+        <Dialog open={dialogKonfirmasiBuka} onOpenChange={setDialogKonfirmasiBuka}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-indigo-600">
+                <KeyRound className="size-5" /> Konfirmasi Sinkronisasi Akun
+              </DialogTitle>
+              <DialogDescription className="pt-2 text-sm text-muted-foreground">
+                Apakah Anda ingin membuatkan akun login otomatis untuk seluruh guru yang belum memiliki akun di portal ini?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="pt-4 flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setDialogKonfirmasiBuka(false)} disabled={loadingAksi}>
+                Batal
+              </Button>
+              <Button onClick={generateAkunMassal} disabled={loadingAksi} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+                {loadingAksi && <Loader2 className="size-4 animate-spin" />}
+                Ya, Buat Akun Otomatis
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {isLoading ? (
           <Skeleton className="h-96 w-full rounded-xl" />
